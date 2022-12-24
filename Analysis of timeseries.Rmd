@@ -1,0 +1,411 @@
+---
+title: "Time Series Analysis of NAICS for Hew Jersy "
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options (warn = -1)
+```
+
+#Describe the attributes of business applications for all NAICS for New Jersy (response variable).
+
+```{r}
+NAICS<-read.csv("NAICSNJ.csv")
+NAICS_NJ<-NAICS$BABATOTALNSANJ
+NAICS_NJts<-ts(NAICS_NJ,start=c(2004,7),freq=12)
+summary(NAICS_NJts)
+```
+
+# Time Series Plot
+```{r}
+plot(NAICS_NJts)
+#The values fluctuates and have a slightly upper trend from 2004 to 2020. As the pandemic stared, the series rises dramatically since 2020
+```
+
+```{r}
+boxplot(NAICS_NJts ~ cycle(NAICS_NJts), names=month.abb)
+# Series rises dramatically since 2020 which is considered as outlier in the monthly boxplot
+```
+
+
+
+```{r}
+par(mar=c(5,5,4,2))
+acf(NAICS_NJ,lag.max=40)
+#Seasonality should be noticed by the wavy process of ACF plot
+pacf(NAICS_NJ,lag.max=40)
+```
+
+```{r}
+plot(NAICS_NJ, type="p", ylab="Business Applications", main="lowess")
+lines(lowess(NAICS_NJ, f=.02),col="blue")
+lines(lowess(NAICS_NJ, f=2/3),col="red")
+```
+
+
+
+# Compare to business applications for all NAICS at the national level
+
+```{r}
+NAICS_US<-read.csv("NAICSUS.csv")
+NAICS_US<-NAICS_US$BABATOTALNSAUS
+NAICS_US<-ts(NAICS_US,start=c(2004,7),freq=12)
+```
+
+```{r}
+zt<-ts(matrix(c(NAICS_NJ,NAICS_US), ncol = 2, byrow = FALSE))
+plot(zt, lty = 1:2,main="NAICS for New Jersy and NAICS at the national level")
+```
+
+```{r}
+par(mar=c(5,5,4,2))
+ccf(NAICS_NJts, NAICS_US,main="NAICS for New Jersy vs NAICS at the national level")
+# A strong association is apparent which is confirmed by the correlation coefficient of 0.986 at lag 0
+```
+
+```{r}
+ratio<-NAICS_NJts/NAICS_US
+summary(ratio)
+plot(ratio)
+#The contribution of response variable towards that of national level has a decreasing trend
+```
+
+
+
+# Describe the attributes of the data for each of the explanatory variables.
+
+# Explanatory variables 1:New Private Housing Units Authorized by Building Permits
+```{r}
+NPHU<-read.csv("New_Private_Housing.csv")
+NPHU_NJ<-NPHU$NJBPPRIV
+NPHU_NJts<-ts(NPHU_NJ,start=c(1988,1),freq=12)
+plot(NPHU_NJts,main="")
+par(mar=c(5,5,4,2))
+acf(NPHU_NJ,lag.max=40)
+pacf(NPHU_NJ,lag.max=40)
+```
+
+# Explanatory variables 2:Average Hourly Earnings of all Employees
+```{r}
+AHE<-read.csv("Average_Hourly_Earnings.csv")
+AHE_NJ<-AHE$SMU34000000500000003
+AHE_NJts<-ts(AHE_NJ,start=c(2007,1),freq=12)
+plot(AHE_NJts,main="")
+par(mar=c(5,5,4,2))
+acf(AHE_NJ,lag.max=40)
+pacf(AHE_NJ,lag.max=40)
+```
+
+# Describe the association between the response variable and the explanatory variables.
+
+```{r}
+NAICS_NJ1<-NAICS_NJ[c(31:219)]
+NPHU_NJ1<-NPHU[c(229:417),]
+NPHU_NJ1<-NPHU_NJ1$NJBPPRIV
+par(mar=c(5,5,4,2))
+ccf(NAICS_NJ1, NPHU_NJ1,main="NAICS for New Jersy vs New Private Housing Units")
+#The CCF plot of Housing shows significant cross-correlations at many lags, some of which have higher cross-correlations than the lag 0 value(The highest value:0.566). It also has slight seasonal pattern.
+ccf(NAICS_NJ1, AHE_NJ,main="NAICS for New Jersy vs Average Hours Earnings")
+#The CCF plot of Earnings shows highest cross-correlations of 0.756 at lag 1.
+
+```
+
+
+
+```{r}
+pairs(cbind(NAICS=NAICS_NJ,Housing_Units=NPHU_NJ1, Average_Hours_Earnings=AHE_NJ))
+# There is a sort of linear relationship between NAICS and Earnings. The relationship between NAICS and Housing is not apparent.
+```
+
+```{r}
+fit.nphu = lm(NAICS_NJ1~ NPHU_NJ1)
+summary(fit.nphu)
+```
+
+```{r,warning=FALSE}
+library(lmtest)
+dwtest(fit.nphu, alternative = "two.sided")
+```
+
+```{r}
+res<-fit.nphu$residuals
+rnum<-0
+rdenom<-0
+n<-length(NAICS_NJ1)
+
+for(i in 2:n){
+rnum<-rnum+res[i]*res[i-1]
+rdenom<-rdenom+res[i-1]^2
+}
+rhat<- rnum/rdenom
+NAICSprime<-rep(0,n-1)
+NPHUprime<-rep(0,n-1)
+#transform data
+for (i in 1:n-1){
+NAICSprime[i]<-NAICS_NJ1[i+1]-rhat*NAICS_NJ1[i]
+NPHUprime[i]<-NPHU_NJ1[i+1]-rhat*NPHU_NJ1[i]}
+fit.nphu.trans<-lm(NAICSprime~NPHUprime)
+summary(fit.nphu.trans)
+dwtest(fit.nphu.trans, alternative = "two.sided")
+```
+
+
+
+```{r}
+#transform back
+b0<-fit.nphu.trans$coefficients[1]/(1-rhat)
+b1<-fit.nphu.trans$coefficients[2]
+b0
+b1
+```
+
+```{r}
+fit.ahe = lm(NAICS_NJ1~ AHE_NJ)
+summary(fit.ahe)
+dwtest(fit.ahe, alternative = "two.sided")
+```
+
+```{r}
+res1<-fit.ahe$residuals
+rnum1<-0
+rdenom1<-0
+n<-length(NAICS_NJ1)
+
+for(i in 2:n){
+rnum1<-rnum1+res1[i]*res1[i-1]
+rdenom1<-rdenom1+res1[i-1]^2
+}
+rhat1<- rnum1/rdenom1
+NAICSprime1<-rep(0,n-1)
+AHEprime<-rep(0,n-1)
+#transform data
+for (i in 1:n-1){
+NAICSprime1[i]<-NAICS_NJ1[i+1]-rhat1*NAICS_NJ1[i]
+AHEprime[i]<-AHE_NJ[i+1]-rhat1*AHE_NJ[i]}
+fit.ahe.trans<-lm(NAICSprime1~AHEprime)
+summary(fit.ahe.trans)
+dwtest(fit.ahe.trans, alternative = "two.sided")
+```
+
+```{r}
+#transform back
+b00<-fit.ahe.trans$coefficients[1]/(1-rhat1)
+b11<-fit.ahe.trans$coefficients[2]
+b00
+b11
+```
+
+
+```{r}
+trend = time(NAICS_NJ1)
+fit1 = lm(NAICS_NJ1~ trend+AHE_NJ)
+summary(fit1)
+```
+
+```{r}
+plot(fit1$residual)
+abline(h=0,col="blue")
+```
+
+```{r}
+#residual histogram & qqplot
+hist(rstudent(fit1),xlab='Standardized Residuals',main='')
+```
+
+```{r}
+qqnorm(rstudent(fit1))
+```
+
+
+```{r}
+acf(rstudent(fit1))
+```
+
+
+```{r}
+dwtest(fit1, alternative = "two.sided")
+```
+
+```{r}
+trend = time(NAICS_NJ1)
+fit2 = lm(NAICS_NJ1~ trend+NPHU_NJ1)
+summary(fit2)
+```
+
+```{r}
+fit3 = lm(NAICS_NJ1~ AHE_NJ+NPHU_NJ1)
+summary(fit3)
+```
+
+
+```{r}
+fit4 = lm(NAICS_NJ1~ trend+AHE_NJ+NPHU_NJ1)
+summary(fit4)
+```
+
+#  Based on the results of linear regression to forecast. Firstly, I utilized Holt-Winters method to predict the values for the next 12 months of predictive variable. Then I made forecasts on NAICS by responding regression models.
+
+
+```{r}
+# Holt-Winters model with multiplicative seasonal for New Private Housing Units
+NPHU_NJ1ts<-ts(NPHU_NJ1, start=c(2007,1), freq=12)
+NPHU_NJ1.hw<-HoltWinters(NPHU_NJ1ts, seasonal="multi")
+NPHU_NJ1.hwp<-predict(NPHU_NJ1.hw,n.ahead=12, prediction.interval = FALSE)
+NPHU_NJ1.hwp
+```
+
+
+```{r}
+## forecasting
+NAICS_NJ1_p<-rep(0,11)
+f<-rep(0,11)
+NPHU_NJ1_f<-NPHU_NJ1
+NPHU_NJ1_f[c(190:201)]<-c(2945,2718,2870,2176,1889,2518,2208,2450,3147,2699,2682,2603)
+e189=NAICS_NJ1[n]-(b0+b1*NPHU_NJ1_f[n])
+for (i in 1:12){
+NAICS_NJ1_p[i]= b0+b1*NPHU_NJ1_f[n+i]
+f[i]=NAICS_NJ1_p[i]+rhat*e189}
+f
+```
+
+```{r}
+f_ts<-ts(f, start=c(2022,10), freq=12)
+plot(NAICS_NJts)
+lines(f_ts,col="red")
+```
+
+```{r}
+# Holt-Winters model with multiplicative seasonal for Average Hourly Earnings
+AHE_NJts<-ts(AHE_NJ, start=c(2007,1), freq=12)
+AHE_NJ.hw<-HoltWinters(AHE_NJts, seasonal="multi")
+AHE_NJ.hwp<-predict(AHE_NJ.hw,n.ahead=12, prediction.interval = FALSE)
+AHE_NJ.hwp
+```
+
+```{r}
+## forecasting
+NAICS_NJ1_p1<-rep(0,11)
+f_AHE<-rep(0,11)
+AHE_NJ_f<-AHE_NJ
+AHE_NJ_f[c(190:201)]<-c(34.27,34.23,34.36,34.75,34.85,34.88,35.18,34.83,34.57,34.60,34.52,34.70)
+e189_1=NAICS_NJ1[n]-(b00+b11*AHE_NJ_f[n])
+for (i in 1:12){
+NAICS_NJ1_p1[i]= b00+b11*AHE_NJ_f[n+i]
+f_AHE[i]=NAICS_NJ1_p1[i]+rhat1*e189_1}
+f_AHE_ts<-ts(f_AHE, start=c(2022,10), freq=12)
+f_AHE_ts
+```
+
+```{r}
+plot(NAICS_NJts)
+lines(f_AHE_ts,col="red")
+```
+# Using Holt-Winters model provide forecasts for the next 12 months (September 2022 is the last data point, the forecast horizon includes October 2022 through September 2023)
+
+```{r}
+# Holt-Winters model with multiplicative seasonal 
+NAICS_NJts.hw<-HoltWinters(NAICS_NJts, seasonal="mult")
+NAICS_NJts.hw
+```
+
+```{r}
+NAICS_NJts.hw$SSE
+```
+
+```{r}
+plot(NAICS_NJts.hw)
+```
+
+```{r}
+plot(NAICS_NJts.hw$fitted)
+```
+
+```{r,warning=FALSE}
+# Holt-Winters model with additive seasonal 
+NAICS_NJts.hw2<-HoltWinters(NAICS_NJts, seasonal="addit")
+NAICS_NJts.hw2
+```
+
+```{r}
+NAICS_NJts.hw2$SSE
+```
+
+```{r}
+plot(NAICS_NJts.hw2$fitted)
+```
+# Forecast next 12 months (a full seasonal period)
+```{r}
+#forecast by the multiplicative model which had relatively lower SSE
+NAICS_NJts.hwp<-predict(NAICS_NJts.hw,n.ahead=12, prediction.interval = TRUE, level=.95)
+plot(NAICS_NJts.hw, NAICS_NJts.hwp)
+```
+
+```{r}
+NAICS_NJts.hwp
+```
+
+##Forecast with SARIMA
+
+
+```{r,warning=FALSE}
+library(tseries)
+adf.test(NAICS_NJts)
+```
+
+```{r}
+# Phillips-Perron test (null: unit root)
+pp.test(NAICS_NJts)
+```
+
+```{r}
+# KPSS test (null: stationary and alternative: unit root)
+kpss.test(NAICS_NJts)
+```
+
+```{r}
+best.sarima <- function(x, maxord = c(1,1,1,1,1,1))
+{
+  best.aic <- 1e8
+  n <- length(x)
+  for (p in 0:maxord[1]) for(d in 0:maxord[2]) for(q in 0:maxord[3])
+    for (P in 0:maxord[4]) for(D in 0:maxord[5]) for(Q in 0:maxord[6])
+    {
+      fit <- arima(x, order = c(p,d,q),seas = list(order = c(P,D,Q), frequency(x)), method = "CSS")
+      fit.aic <- -2 * fit$loglik + (log(n) + 1) * length(fit$coef)
+      if (fit.aic < best.aic)
+      {
+        best.aic <- fit.aic
+        best.fit <- fit
+        best.model <- c(p,d,q,P,D,Q)
+      }
+    }
+  list(best.aic, best.fit, best.model)
+}
+best.sarima(NAICS_NJts,maxord = c(2,1,4,1,1,2))
+
+```
+
+# Virtualization for forcasting next 3 years
+```{r}
+pre=36
+t = seq(2004,2026,1/12)
+year = t
+n = length(t)
+fit_ar = arima(NAICS_NJts,c(0,1,1),seasonal = list(order = c(0,1,1), period = 12))
+pred_ar = predict(fit_ar, n.ahead =pre )
+t1 = 7:225
+t2 = 226:(226+(pre-1))
+plot(year[t1],NAICS_NJts,type="o",lty=1, xlab="year",ylab="NAICS",xlim=c(2010,2026),ylim=c(5000,21000))
+points(year[t2], as.matrix(pred_ar$pred),type="b",pch="*",lty=2)
+lines(year[t2], pred_ar$pred - 1.96*pred_ar$se,col="blue")
+lines(year[t2], pred_ar$pred + 1.96*pred_ar$se,col="blue")
+legend("topleft",c("data","predictions","lower CL","upper CL"), pch=c("o","*",NA,NA),col=c("black","black","blue","blue"),
+lty=c(2,3,1,1))
+```
+
+# Forecast next 36 months (3 full sesonal period)
+```{r}
+pred_ar
+```
+
+

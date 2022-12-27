@@ -26,6 +26,10 @@ Explanatory Variables 2: Average Hourly Earnings of all Employees: Total Private
 ACF plots, PACF plots, boxplot, smoothing techniques(Lowess),scatterplot matrix, cross-correlations, etc.
 
 ### Regression analysis
+I utilized the linear regression models between the response variable and two predictive variables respectively. I also formed a multiple linear regression model using both explanatory variables. Meanwhile, I have added time dummy with Housing and Earnings to produce regression models.
+
+I have chosen the models with significant p-values for each term. Then I applied the two-sided Durbin-Watson Test for the autocorrelation parameter on the models. If the DW statistic indicates the presence of serial correlation of the residuals, I remedied it using the Cochrane-Orcutt method.
 
 ### Forecast
+
 

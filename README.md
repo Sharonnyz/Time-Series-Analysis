@@ -32,4 +32,7 @@ I have chosen the models with significant p-values for each term. Then I applied
 
 ### Forecast
 
+- Forecast based on regression model
+- Holt-Winters method
+- SARIMA
 

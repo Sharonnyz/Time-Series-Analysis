@@ -20,3 +20,12 @@ Explanatory Variables 1: New Private Housing Units Authorized by Building Permit
 
 Explanatory Variables 2: Average Hourly Earnings of all Employees: Total Private for New Jersy
 
+## Methods
+
+### Basic explanatory data analysis tools
+ACF plots, PACF plots, boxplot, smoothing techniques(Lowess),scatterplot matrix, cross-correlations, etc.
+
+### Regression analysis
+
+### Forecast
+
